@@ -7,9 +7,9 @@ import os
 
 #Pre: a file name, e.g. "hello.txt"
 #Post: True or false if the file was able to be downloaded or not
-def request_file(file_name, storage_path, host):
-    get_request(file_name, storage_path, host)
+def request_file(file_name, storage_path, host, congestion_alg):
+    get_request(file_name, storage_path, host, congestion_alg)
 
 #Post: List of all available movies
-def request_movie_list(storage_path, host):
-    get_request("list_movies", storage_path, host)
+def request_movie_list(storage_path, host, congestion_alg):
+    get_request("list_movies", storage_path, host, congestion_alg)

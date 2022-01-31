@@ -2403,23 +2403,23 @@ void HQSession::HQStreamTransportBase::initIngress(const std::string& where) {
 
 HTTPTransaction* FOLLY_NULLABLE
 HQSession::newTransaction(HTTPTransaction::Handler* handler) {
-  VLOG(4) << __func__ << " sess=" << *this;
+  VLOG(0) << __func__ << " sess=" << *this; //4
 
   if (drainState_ == DrainState::CLOSE_SENT ||
       drainState_ == DrainState::FIRST_GOAWAY ||
       drainState_ == DrainState::DONE) {
-    VLOG(4) << __func__ << " newTransaction after drain: " << *this;
+    VLOG(0) << __func__ << " newTransaction after drain: " << *this; //4
     return nullptr;
   }
   if (!sock_->good()) {
-    VLOG(4) << __func__ << " newTransaction after sock went bad: " << this;
+    VLOG(0) << __func__ << " newTransaction after sock went bad: " << this; //4
     return nullptr;
   }
 
   // TODO stream limit handling
   auto quicStreamId = sock_->createBidirectionalStream();
   if (!quicStreamId) {
-    VLOG(2) << __func__ << " failed to create new stream: " << this;
+    VLOG(0) << __func__ << " failed to create new stream: " << this;//2
     return nullptr;
   }
 
@@ -2429,8 +2429,8 @@ HQSession::newTransaction(HTTPTransaction::Handler* handler) {
     // generate grease frame
     auto writeGreaseFrameResult = hq::writeGreaseFrame(hqStream->writeBuf_);
     if (writeGreaseFrameResult.hasError()) {
-      VLOG(2) << __func__ << " failed to create grease frame: " << *this
-              << ". Error = " << writeGreaseFrameResult.error();
+      VLOG(0) << __func__ << " failed to create grease frame: " << *this
+              << ". Error = " << writeGreaseFrameResult.error(); //2
       return nullptr;
     }
   }
@@ -2441,8 +2441,8 @@ HQSession::newTransaction(HTTPTransaction::Handler* handler) {
     sock_->setReadCallback(quicStreamId.value(), this);
     return &hqStream->txn_;
   } else {
-    VLOG(3) << __func__ << "Failed to create new transaction on "
-            << quicStreamId.value();
+    VLOG(0) << __func__ << "Failed to create new transaction on "
+            << quicStreamId.value(); //3
     abortStream(HTTPException::Direction::INGRESS_AND_EGRESS,
                 quicStreamId.value(),
                 HTTP3::ErrorCode::HTTP_INTERNAL_ERROR);
