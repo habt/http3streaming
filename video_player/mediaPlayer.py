@@ -135,7 +135,6 @@ class Window(QWidget):
     def refresh_movie_list(self):
         pathy = os.getcwd() + "/list_movies"
         request_movie_list(os.getcwd(), self.ip, self.cca, self.vlog)
-        print("after request movie list")
         if(os.path.isfile(pathy)):
             if(exists(pathy)):
                 if(os.stat("list_movies").st_size != 0):
