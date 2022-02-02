@@ -21,11 +21,13 @@ class RunHandler:
 #Init functions                #
 ################################
 
-    def __init__(self, filename, host_ip):
+    def __init__(self, filename, host_ip, cca, log_level):
         self.filename = filename
         self.mpdPath = None
         self.Qbuf = None
         self.host_ip = host_ip
+        self.cca = cca
+        self.log_quic = log_level
         self.nextSegment = None
         self.newSegment = None
         self.rebuffCount = 0
@@ -67,7 +69,7 @@ class RunHandler:
         dir_path = f'{os.getcwd()}/vid/{filename}'
         os.mkdir(dir_path)
 
-        request_file(dash_path, dir_path, self.host_ip)
+        request_file(dash_path, dir_path, self.host_ip, self.cca, self.log_quic)
         mpdPath = f'{dir_path}/dash.mpd'
         mpdPath_isfile = os.path.isfile(mpdPath)
         print(f'{mpdPath_isfile}   file is   {mpdPath}')
@@ -85,7 +87,7 @@ class RunHandler:
         file_ending = ".m4s"
 
         for index in range(quality_count):
-            request_file(f'{directory_name}/{init_base_name}{index}{file_ending}', f'{os.getcwd()}/vid/{directory_name}', self.host_ip)
+            request_file(f'{directory_name}/{init_base_name}{index}{file_ending}', f'{os.getcwd()}/vid/{directory_name}', self.host_ip, self.cca, self.log_quic)
 
     #PRE: Path to downloaded .mpd file
     #POST: parser object
@@ -108,8 +110,8 @@ class RunHandler:
 
     def log_name_generator(self, filename):
         now = datetime.now()
-        dt_string = now.strftime("%d_%m_%Y_%H:%M:%S")
-        return filename+"_"+dt_string
+        dt_string = now.strftime("%Y_%m_%d_%H-%M-%S")
+        return filename + "_" + dt_string + "_"+self.cca + ".log"
 
     def log_message(self, msg):
         logging.info(msg)
@@ -128,6 +130,7 @@ class RunHandler:
 
         if(len(self.throughputList) > 0):
             q = student_entrypoint(self.throughputList[-1]* 8, self.queue_time(), self.parsObj.get_qualities(), self.rebuffCount)
+            print(self.parsObj.get_qualities())
             self.rebuffCount = 0
 
         if q is not self.latest_quality:
@@ -156,9 +159,9 @@ class RunHandler:
                 print("Failed to get index and quality")
 
             t1_start = perf_counter()
-            request_file(f'{self.title}/{segment[0]}', vidPath, self.host_ip)
+            request_file(f'{self.title}/{segment[0]}', vidPath, self.host_ip, self.cca, self.log_quic)
             t1_stop = perf_counter()
-            request_file(f'{self.title}/{segment[1]}', vidPath, self.host_ip)
+            request_file(f'{self.title}/{segment[1]}', vidPath, self.host_ip, self.cca, self.log_quic)
 
             calculated_throughput = round(os.path.getsize(vidPath + segment[0])/(t1_stop - t1_start))
             self.throughputList.append(calculated_throughput)

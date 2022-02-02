@@ -20,12 +20,19 @@ class Window(QWidget):
         self.temp_stop_time = 0
         self.total_playback_time = 0
 
-        self.ip = next((x for x in sys.argv if x.startswith("host=")), None)
+        self.ip = next((x for x in sys.argv if x.startswith("-host=")), None)
         if(self.ip is None):
             self.ip = "130.243.27.204"
         else:
-            self.ip = self.ip.split("host=")[1]
+            self.ip = self.ip.split("-host=")[1]
 
+        self.cca = next((x for x in sys.argv if x.startswith("-cca=")), None)
+        if(self.cca is None):
+            self.cca = "cubic"
+        else:
+            self.cca = self.cca.split("-cca=")[1]
+        
+        self.vlog = "1"
         self.setWindowTitle("Media Player")
         self.setGeometry(350, 100, 700, 500)
         self.movie_handler = None
@@ -113,7 +120,7 @@ class Window(QWidget):
             path = item.text()
 
 
-            self.movie_handler = RunHandler(path.split("/")[-1], self.ip)
+            self.movie_handler = RunHandler(path.split("/")[-1], self.ip, self.cca, self.vlog)
             self.movie_handler.log_message(f'MOVIE LOADED server at {self.ip}')
             self.temp_start_time = perf_counter()
             self.check=0
@@ -127,8 +134,8 @@ class Window(QWidget):
 
     def refresh_movie_list(self):
         pathy = os.getcwd() + "/list_movies"
-        request_movie_list(os.getcwd(), self.ip)
-
+        request_movie_list(os.getcwd(), self.ip, self.cca, self.vlog)
+        print("after request movie list")
         if(os.path.isfile(pathy)):
             if(exists(pathy)):
                 if(os.stat("list_movies").st_size != 0):
