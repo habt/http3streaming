@@ -8,7 +8,7 @@ from handler import RunHandler
 import sys
 from time import perf_counter
 import os, shutil
-#import time
+import time
 from os.path import exists
 
 class Window(QWidget):
@@ -19,20 +19,40 @@ class Window(QWidget):
         self.temp_start_time = 0
         self.temp_stop_time = 0
         self.total_playback_time = 0
-
-        self.ip = next((x for x in sys.argv if x.startswith("host=")), None)
+        
+        #IP of streaming server
+        self.ip = next((x for x in sys.argv if x.startswith("-host=")), None)
         if(self.ip is None):
             self.ip = "130.243.27.204"
         else:
-            self.ip = self.ip.split("host=")[1]
+            self.ip = self.ip.split("-host=")[1]
+
+        # CCA input
+        self.cca = next((x for x in sys.argv if x.startswith("-cca=")), None)
+        if(self.cca is None):
+            self.cca = "cubic"
+        else:
+            self.cca = self.cca.split("-cca=")[1]
+
+        # Name of video to be steamed
+        self.video_name = next((x for x in sys.argv if x.startswith("-video=")), None)
+        if(self.video_name is None):
+            pass
+            #self.video_name = "long"
+        else:
+            self.video_name = self.video_name.split("-video=")[1]
         
-        self.cca = "cubic"
+        self.vlog = "1"
         self.setWindowTitle("Media Player")
         self.setGeometry(350, 100, 700, 500)
         self.movie_handler = None
-        self.init_ui()
-        self.show()
-        print("Server set to: ", self.ip)
+        
+        if(self.video_name is None):
+            self.init_ui()
+            self.show()
+        else:
+            self.request_movie() # this replaces init_ui() and show() when we request video through cli
+            #self.simulate_videoplayer();
 
     def init_ui(self):
         # Create media player object
@@ -106,19 +126,25 @@ class Window(QWidget):
 
 
     def request_movie(self):
-        item = self.listwidget.currentItem()
-        if item is None:
-            print("You must choose a movie from the list")
+        if(self.video_name is None):
+            item = self.listwidget.currentItem()
+            if item is None:
+                print("You must choose a movie from the list")
+            else:
+                self.remove_folders()
+                path = item.text()
+                self.movie_handler = RunHandler(path.split("/")[-1], self.ip, self.cca, self.vlog)
         else:
             self.remove_folders()
-            path = item.text()
-
-
-            self.movie_handler = RunHandler(path.split("/")[-1], self.ip, self.cca)
-            self.movie_handler.log_message(f'MOVIE LOADED server at {self.ip}')
-            self.temp_start_time = perf_counter()
-            self.check=0
+            self.movie_handler = RunHandler(self.video_name, self.ip, self.cca, self.vlog)
+        
+        self.movie_handler.log_message(f'MOVIE LOADED server at {self.ip}')
+        self.temp_start_time = perf_counter()
+        self.check=0
+        if(self.video_name is None):
             self.open_file()
+        else:
+            self.simulate_videoplayer()
 
     def update_list_widget(self):
         self.listwidget.clear()
@@ -128,8 +154,7 @@ class Window(QWidget):
 
     def refresh_movie_list(self):
         pathy = os.getcwd() + "/list_movies"
-        request_movie_list(os.getcwd(), self.ip, self.cca)
-
+        request_movie_list(os.getcwd(), self.ip, self.cca, self.vlog)
         if(os.path.isfile(pathy)):
             if(exists(pathy)):
                 if(os.stat("list_movies").st_size != 0):
@@ -156,6 +181,18 @@ class Window(QWidget):
         else:
             self.mediaPlayer.play()
             self.temp_start_time = perf_counter()
+   
+    # A simple simulated player for automatic testing. Dequeues a segment from the buffer 
+    # And sleeps for the duration of the segment before retrieving the next one 
+    def simulate_videoplayer(self):
+        segment = True
+        while(segment):
+            segment,duration = self.movie_handler.get_next_segment()
+            print(segment,duration)
+            if(segment):
+                time.sleep(duration)
+        print("Simulated player finished")
+        sys.exit()
 
 
     def state_changed(self):
@@ -196,6 +233,8 @@ class Window(QWidget):
             else:
                 self.mediaPlaylist.removeMedia(self.mediaPlaylist.nextIndex()+1)
 
+        print(self.check)
+
 
     def set_position(self, position):
         self.mediaPlayer.setPosition(position)
@@ -203,10 +242,11 @@ class Window(QWidget):
 
     def fill_playlist(self, slots = 2):
         for _ in range(slots):
-            segment = self.movie_handler.get_next_segment()
+            segment = self.movie_handler.get_next_segment()[0]
             if segment is not False:
                 media_content = QMediaContent(QUrl.fromLocalFile(os.getcwd() + "/" + segment))
                 self.mediaPlaylist.addMedia(media_content)
+                print("In fill_playlist: media_content added")
 
 
     def clear_playlist(self):
@@ -215,16 +255,19 @@ class Window(QWidget):
 
 
     def add_media(self):
-        segment = self.movie_handler.get_next_segment()
+        segment = self.movie_handler.get_next_segment()[0]
         if segment is not False:
+            print("In add_media: media_content added")
             media_content = QMediaContent(QUrl.fromLocalFile(os.getcwd() + "/" + segment))
             return self.mediaPlaylist.addMedia(media_content)
         else:
             return segment
 
     def insert_media(self,pos):
-        segment = self.movie_handler.get_next_segment()
+        print("Current video index = ", self.mediaPlaylist.currentIndex())
+        segment = self.movie_handler.get_next_segment()[0]
         if segment is not False:
+            print("In insert_media: media_content added")
             media_content = QMediaContent(QUrl.fromLocalFile(os.getcwd() + "/" + segment))
             return self.mediaPlaylist.insertMedia(pos, media_content)
         else:

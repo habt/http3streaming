@@ -326,7 +326,7 @@ function setup_mvfst() {
   MVFST_BUILD_DIR=$DEPS_DIR/mvfst/build/
   if [ ! -d "$MVFST_DIR" ] ; then
     echo -e "${COLOR_GREEN}[ INFO ] Cloning mvfst repo ${COLOR_OFF}"
-    git clone git@git.cs.kau.se:habthail/mvfst.git "$MVFST_DIR"
+    #git clone git@git.cs.kau.se:habthail/mvfst.git "$MVFST_DIR"
   fi
   synch_dependency_to_commit "$MVFST_DIR" "$BASE_DIR"/../build/deps/github_hashes/facebookincubator/mvfst-rev.txt
   echo -e "${COLOR_GREEN}Building Mvfst ${COLOR_OFF}"
