@@ -113,7 +113,10 @@ class MPDParser():
             return self._parse_time(self.mpd.min_buffer_time)
         else:
             return None
-
+    
+    # Return minimum number of segments recommended for the buffer
+    def get_min_number_segments(self):
+        return self.get_min_buffer_time()/self.get_max_segment_duration()
 
     # Return a tuple of media and audio chunks (media, audio)
     def get_next_segment(self, adaptation_set: int = None, bandwidth = 0):

@@ -21,7 +21,7 @@ class RunHandler:
 #Init functions                #
 ################################
 
-    def __init__(self, filename, host_ip, cca, log_level):
+    def __init__(self, filename, host_ip, cca, log_level, naming_extra):
         self.filename = filename
         self.mpdPath = None
         self.Qbuf = None
@@ -38,17 +38,17 @@ class RunHandler:
         self.thread = threading.Thread(target=self.queue_handler, daemon=True)
         self.stop = threading.Event()
         self.throughputList = []
-        print(self.hitIt(filename))
+        print(self.hitIt(filename, naming_extra))
         self.thread.start()
         print("Init done")
 
 
-    def hitIt(self,filename):
+    def hitIt(self,filename, extra):
         self.mpdPath = self.request_mpd(filename)
         if not self.mpdPath: return "Error getting mpdPath in : request_mpd("+filename+")"
         tmp = self.init_Obj()
         self.request_all_init_files(self.parsObj.number_of_qualities())
-        logging.basicConfig(filename="log/" + self.log_name_generator(filename),
+        logging.basicConfig(filename="log/" + self.log_name_generator(filename, extra),
                                     filemode='a',
                                     format='%(asctime)s,%(msecs)d %(levelname)s %(message)s',
                                     datefmt='%H:%M:%S',
@@ -98,7 +98,7 @@ class RunHandler:
     def init_Obj(self):
         try:
             self.parsObj = MPDParser(self.mpdPath)
-            size = int(self.parsObj.get_min_buffer_time()/2)
+            size = int(self.parsObj.get_min_buffer_time()/8) #TODO: here assuming max segment duration is 8 seconds
             if self.parsObj.amount_of_segments() < size:
                 size = self.parsObj.amount_of_segments()
             self.Qbuf = queue.Queue(size)
@@ -113,10 +113,10 @@ class RunHandler:
 #Log                           #
 ################################
 
-    def log_name_generator(self, filename):
+    def log_name_generator(self, filename, extra):
         now = datetime.now()
         dt_string = now.strftime("%Y_%m_%d_%H-%M-%S")
-        return filename + "_" + dt_string + "_"+self.cca + ".log"
+        return filename + "_" + self.cca + "_" + extra + "_" +  dt_string + ".log"
 
     def log_message(self, msg):
         logging.info(msg)

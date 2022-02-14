@@ -10,4 +10,5 @@ def get_request(file_name, storage_path, host_ip, cca, log):
     congestion = "-congestion=" + cca
     pacing = "-pacing=true" 
     vlog = "-v=1"
+    print(file_name,storage_path)
     subprocess.run([program_name, hq_mode, file_path, store, host, congestion, vlog],  stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT)

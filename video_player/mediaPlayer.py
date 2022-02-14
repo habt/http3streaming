@@ -42,6 +42,14 @@ class Window(QWidget):
         else:
             self.video_name = self.video_name.split("-video=")[1]
         
+         # extra string for naming experiment log file
+        self.extra = next((x for x in sys.argv if x.startswith("-extra=")), None)
+        if(self.extra is None):
+            pass
+            #self.extra = "const_rate"
+        else:
+            self.extra = self.extra.split("-extra=")[1]
+            print(self.extra)
         self.vlog = "1"
         self.setWindowTitle("Media Player")
         self.setGeometry(350, 100, 700, 500)
@@ -133,10 +141,10 @@ class Window(QWidget):
             else:
                 self.remove_folders()
                 path = item.text()
-                self.movie_handler = RunHandler(path.split("/")[-1], self.ip, self.cca, self.vlog)
+                self.movie_handler = RunHandler(path.split("/")[-1], self.ip, self.cca, self.vlog, self.extra)
         else:
             self.remove_folders()
-            self.movie_handler = RunHandler(self.video_name, self.ip, self.cca, self.vlog)
+            self.movie_handler = RunHandler(self.video_name, self.ip, self.cca, self.vlog,self.extra)
         
         self.movie_handler.log_message(f'MOVIE LOADED server at {self.ip}')
         self.temp_start_time = perf_counter()
@@ -186,11 +194,20 @@ class Window(QWidget):
     # And sleeps for the duration of the segment before retrieving the next one 
     def simulate_videoplayer(self):
         segment = True
+        is_first_segment = True
+        video_length = 0
         while(segment):
             segment,duration = self.movie_handler.get_next_segment()
+            video_length += duration #TODO: for now only. this should not be done here
+            if is_first_segment:
+                play_start_time = time.time()
+                is_first_segment = False
             print(segment,duration)
             if(segment):
                 time.sleep(duration)
+        play_duration = time.time() - play_start_time
+        self.movie_handler.log_message(f'PLAY_DURATION {play_duration}')
+        self.movie_handler.log_message(f'VIDEO_LENGTH {video_length}')
         print("Simulated player finished")
         sys.exit()
 
