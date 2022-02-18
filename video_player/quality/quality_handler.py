@@ -12,10 +12,12 @@ import time
 bitrate = 0
 def student_entrypoint(Measured_Bandwidth, Buffer_Occupancy, Available_Bitrates, Rebuffering_Time):
     #student can do whatever they want from here going forward
+    print("measured bandwidth: " , Measured_Bandwidth, Buffer_Occupancy, Available_Bitrates, Rebuffering_Time)
     global bitrate
     R_i = list(Available_Bitrates.items())
     R_i.sort(key=lambda tup: tup[1] , reverse=True)
-    bitrate = DASH(buf_time = Buffer_Occupancy, rebuffering = Rebuffering_Time ,est_bandwidth=Measured_Bandwidth, T_low=8, T_rich=40, R_i = R_i, previous_bitrate =bitrate)
+    bitrate = DASH(buf_time = Buffer_Occupancy, rebuffering = Rebuffering_Time ,est_bandwidth=Measured_Bandwidth, T_low=4, T_rich=40, R_i = R_i, previous_bitrate =bitrate)
+    print("selected bitrate: ", bitrate , Buffer_Occupancy)
     return bitrate
 
 #helper function, to find the corresponding size of bitrate
@@ -30,7 +32,7 @@ def index(value,list_of_list):
             return e
     return len(list_of_list)-1
 
-def DASH(buf_time, rebuffering ,est_bandwidth, R_i , previous_bitrate, T_low=8, T_rich=40):
+def DASH(buf_time, rebuffering ,est_bandwidth, R_i , previous_bitrate, T_low=4, T_rich=40):
     '''
     Input:
     T_low = 4: the threshold for deciding that the buffer length is low
@@ -52,7 +54,7 @@ def DASH(buf_time, rebuffering ,est_bandwidth, R_i , previous_bitrate, T_low=8, 
     if buf_time >= T_low*2:
         for k in range(0, m):
             #print(est_bandwidth/8 >= R_i[k][1])
-            if est_bandwidth/8 >= R_i[k][1]: #get reasonable value under bandwidth
+            if est_bandwidth >= R_i[k][1]: #get reasonable value under bandwidth
                 rate_next = R_i[k][0]
                 return rate_next
 
