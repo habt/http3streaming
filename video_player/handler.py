@@ -50,7 +50,7 @@ class RunHandler:
         self.request_all_init_files(self.parsObj.number_of_qualities())
         logging.basicConfig(filename="log/" + self.log_name_generator(filename, extra),
                                     filemode='a',
-                                    format='%(asctime)s,%(msecs)d %(levelname)s %(message)s',
+                                    format='%(asctime)s.%(msecs)d %(levelname)s %(message)s',
                                     datefmt='%H:%M:%S',
                                     level=logging.DEBUG)
         if not tmp[0]: return tmp
@@ -98,7 +98,8 @@ class RunHandler:
     def init_Obj(self):
         try:
             self.parsObj = MPDParser(self.mpdPath)
-            size = int(self.parsObj.get_min_buffer_time()/8) #TODO: here assuming max segment duration is 8 seconds
+            print("min buf time: ",self.parsObj.get_min_buffer_time())
+            size = int(self.parsObj.get_min_buffer_time()/8) + 1 #TODO: here assuming max segment duration is 8 seconds
             if self.parsObj.amount_of_segments() < size:
                 size = self.parsObj.amount_of_segments()
             self.Qbuf = queue.Queue(size)
@@ -186,7 +187,7 @@ class RunHandler:
 
     #Used by the videoplayer to get next .mp4 path
     def get_next_segment(self):
-        block_duration = 5 #block for the given amt of seconds if empty
+        block_duration = 100 #block for the given amt of seconds if empty
         self.newSegment = self.Qbuf.get(block=True, timeout=block_duration)
         if not self.newSegment:
             print("get_next_segment ERROR: no newSegment")
