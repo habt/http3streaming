@@ -14,6 +14,7 @@ import math
 from pathlib import Path
 import logging
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 class RunHandler:
 
@@ -38,6 +39,11 @@ class RunHandler:
         self.thread = threading.Thread(target=self.queue_handler, daemon=True)
         self.stop = threading.Event()
         self.throughputList = []
+        self.allowed_ongoing_requests = 5
+        self.ongoing_requests = 0
+        self.qsize = 0
+        self.request_executor = ThreadPoolExecutor(self.allowed_ongoing_requests)
+        self.request_executor_futures = ["none"] * self.allowed_ongoing_requests
         print(self.hitIt(filename, naming_extra))
         self.thread.start()
         print("Init done")
@@ -102,8 +108,9 @@ class RunHandler:
             size = int(self.parsObj.get_min_buffer_time()/8) + 1 #TODO: here assuming max segment duration is 8 seconds
             if self.parsObj.amount_of_segments() < size:
                 size = self.parsObj.amount_of_segments()
-            self.Qbuf = queue.Queue(size)
-            print("Queue Size: ", size)
+            self.qsize = size + self.allowed_ongoing_requests
+            self.Qbuf = queue.Queue(self.qsize)
+            print("Queue Size: ", self.qsize)
             print("Available qualities: ",self.parsObj.get_qualities()) 
             return True, ""
         except:
@@ -177,6 +184,7 @@ class RunHandler:
             self.killthread()
 
         self.Qbuf.put(self.nextSegment)
+        self.ongoing_requests = self.ongoing_requests - 1
 
     #PRE: path to next chunks(dir), Index of start and end chunk, quality
     #POST: path to .mp4 file
@@ -209,14 +217,28 @@ class RunHandler:
 #Queue functions               #
 ################################
 
+    def get_available_future_index(self):
+        for index,future in enumerate(self.request_executor_futures):
+            if future == "none":
+                return index
+            elif future.done():
+                return index
+            else:
+                return self.allowed_ongoing_requests + 1
+
     #PRE:
     #POST:
     #decides when new segments(chunks) should be sent to videoplayer
     def queue_handler(self):
         while not self.stop.is_set():
             with self.pause_cond:
-                while not self.Qbuf.full():
-                    self.parse_segment()
+                print(len(self.Qbuf.queue), self.ongoing_requests, self.qsize)
+                while len(self.Qbuf.queue) + self.ongoing_requests < self.qsize:
+                    self.ongoing_requests = self.ongoing_requests + 1
+                    i = self.get_available_future_index()
+                    print(i,self.ongoing_requests)
+                    if i < self.allowed_ongoing_requests:
+                        self.request_executor_futures[i] = self.request_executor.submit(self.parse_segment())
                     if not self.newSegment:
                         break
                 self.pause_cond.acquire()
