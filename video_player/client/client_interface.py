@@ -8,12 +8,13 @@ import os
 #Pre: a file name, e.g. "hello.txt"
 #Post: True or false if the file was able to be downloaded or not
 def request_file(file_name, storage_path, host, cca, log, request_type):
-    if request_type == 'mpd':
+    if request_type == 'MPD':
         piped = get_first_request(file_name, storage_path, host, cca, log)
         print("mpd requested")
         return piped
     else:
         get_request(file_name)
+        return true
 
 #Post: List of all available movies
 def request_movie_list(storage_path, host, cca, log):
