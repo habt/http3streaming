@@ -1,4 +1,0 @@
-föra över funktioner från mediaPlayer som ska vara i handler
-byta så man ber om .mpd istället för .mp4
-skicka den .mpd filen till parsern
-kolla outputen

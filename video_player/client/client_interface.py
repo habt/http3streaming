@@ -1,4 +1,4 @@
-from client.client_comm import get_request
+from client.client_comm import get_request, get_first_request
 import os
 
 #Usage:
@@ -7,8 +7,13 @@ import os
 
 #Pre: a file name, e.g. "hello.txt"
 #Post: True or false if the file was able to be downloaded or not
-def request_file(file_name, storage_path, host, cca, log):
-    get_request(file_name, storage_path, host, cca, log)
+def request_file(file_name, storage_path, host, cca, log, request_type):
+    if request_type == 'mpd':
+        piped = get_first_request(file_name, storage_path, host, cca, log)
+        print("mpd requested")
+        return piped
+    else:
+        get_request(file_name)
 
 #Post: List of all available movies
 def request_movie_list(storage_path, host, cca, log):
