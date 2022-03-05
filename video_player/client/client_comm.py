@@ -10,11 +10,12 @@ def get_first_request(file_name, storage_path, host_ip, cca, log):
     host = "--host=" + host_ip
     congestion = "-congestion=" + cca
     pacing = "-pacing=true" 
-    vlog = "-v=1"
+    vlog = "-v=0"
     print(file_name,storage_path)
     piped_request = subprocess.Popen([program_name, hq_mode, file_path, store, host, congestion, vlog],  stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     print("after popen call")
     return piped_request
 
-def get_request(file_name, storage_path, host_ip, cca, log):
-    piped_request.communicate(input=file_name)
+def get_request(piped,file_name):
+    piped.stdin.write(file_name)
+    piped.stdin.flush()

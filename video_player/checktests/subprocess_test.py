@@ -15,12 +15,14 @@ def get_first_request(file_name, storage_path, host_ip, cca):
     vlog = "-v=0"
     print(file_name,storage_path)
     piped_request = subprocess.Popen([program_name, hq_mode, file_path, store, host, congestion, vlog],  stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    #piped_request = subprocess.Popen(["./checktests/test_shell.sh", hq_mode, file_path, store, host, congestion, vlog],  stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     print("after popen call")
     return piped_request
 
 def get_request(piped, filename):
     print("before stdin write")
-    piped.stdin.write(b'/test_25MB.txt')
+    piped.stdin.write(filename)
+    piped.stdin.flush()
     print("after stdin write")
 
 def enqueue_output(out, queue):
@@ -42,11 +44,13 @@ def main():
     host = '10.10.2.1'
     cca = 'cubic'
     pp = get_first_request(filename, store, host, cca)
-    #start_readThread(pp)
+    start_readThread(pp)
     time.sleep(1)
     print("after sleep")
     get_request(pp,b'/test_25MB.txt\n')
     print("after get_request")
+    time.sleep(1)
+    get_request(pp,b'/test_50MB.txt\n')
     time.sleep(1)
     get_request(pp,b'exit\n')
 
