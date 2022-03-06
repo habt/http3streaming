@@ -1,11 +1,33 @@
 import subprocess
 import os
+import time
 
-def get_first_request(file_name, storage_path, host_ip, cca, log):
-    global piped_request
+def blocking_request(file_name, storage_path, host_ip, cca, log):
     program_name = "./team"
     hq_mode = "-mode=client"
     file_path = "--path=/" + file_name
+    store = "-outdir=" + storage_path
+    host = "--host=" + host_ip
+    congestion = "-congestion=" + cca
+    pacing = "-pacing=true"
+    vlog = "-v=0"
+    print(file_name,storage_path)
+    piped_request = subprocess.Popen([program_name, hq_mode, file_path, store, host, congestion, vlog],  stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    print("after popen call")
+    piped_request.stdin.write(b'exit\n')
+    piped_request.stdin.flush
+    print("after flushing stdin")
+    time.sleep(0.5)
+    piped_request.kill()
+    piped_request.wait()
+    print("after popen wait")
+    return True
+
+def start_nonBlocking_request(file_name, storage_path, host_ip, cca, log):
+    global piped_request
+    program_name = "./team"
+    hq_mode = "-mode=client"
+    file_path = "--path=" + file_name
     store = "-outdir=" + storage_path
     host = "--host=" + host_ip
     congestion = "-congestion=" + cca
@@ -13,9 +35,11 @@ def get_first_request(file_name, storage_path, host_ip, cca, log):
     vlog = "-v=0"
     print(file_name,storage_path)
     piped_request = subprocess.Popen([program_name, hq_mode, file_path, store, host, congestion, vlog],  stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-    print("after popen call")
+    print("non_blocking request started, after popen call")
     return piped_request
 
 def get_request(piped,file_name):
+    print("get_request: new segment requested")
     piped.stdin.write(file_name)
     piped.stdin.flush()
+    print("get_request: after new segment flush")

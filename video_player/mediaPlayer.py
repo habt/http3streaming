@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVB
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent, QMediaPlaylist
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtCore import Qt, QUrl
-from client.client_interface import request_movie_list, request_file
+from client.client_interface import * #TODO: request_*() functions. NB: not used here, i think
 from handler import RunHandler
 #import threading
 import sys
@@ -45,7 +45,7 @@ class Window(QWidget):
          # extra string for naming experiment log file
         self.extra = next((x for x in sys.argv if x.startswith("-extra=")), None)
         if(self.extra is None):
-            pass
+            self.extra = "test"
             #self.extra = "const_rate"
         else:
             self.extra = self.extra.split("-extra=")[1]
@@ -149,10 +149,15 @@ class Window(QWidget):
         self.movie_handler.log_message(f'MOVIE LOADED server at {self.ip}')
         self.temp_start_time = perf_counter()
         self.check=0
-        if(self.video_name is None):
-            self.open_file()
-        else:
-            self.simulate_videoplayer()
+        #TODO: raise an event in handler instead of this infinite loop
+        while True:
+            if self.movie_handler.isInitialized():
+                print("handler initialized, proceed to player")
+                if(self.video_name is None):
+                    self.open_file()
+                else:
+                    self.simulate_videoplayer()
+                break
 
     def update_list_widget(self):
         self.listwidget.clear()
@@ -193,18 +198,22 @@ class Window(QWidget):
     # A simple simulated player for automatic testing. Dequeues a segment from the buffer 
     # And sleeps for the duration of the segment before retrieving the next one 
     def simulate_videoplayer(self):
+        print("inside simulateplayer")
         segment = True
         is_first_segment = True
         video_length = 0
         while(segment):
             segment,duration = self.movie_handler.get_next_segment()
+            print("simulated player dequeued segment of duration ", duration, "secs")
             video_length += duration #TODO: for now only. this should not be done here
             if is_first_segment:
                 play_start_time = time.time()
                 is_first_segment = False
             print(segment,duration)
             if(segment):
-                time.sleep(duration)
+                #time.sleep(duration)
+                time.sleep(2)
+            print("total playout so far = ", video_length, "secs")
         play_duration = time.time() - play_start_time
         self.movie_handler.log_message(f'PLAY_DURATION {play_duration}')
         self.movie_handler.log_message(f'VIDEO_LENGTH {video_length}')
