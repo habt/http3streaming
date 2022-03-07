@@ -311,7 +311,7 @@ class RunHandler:
     #######################################
     
     # Metadata order[ segment[0], vidPath, index, quality, t1_start, iscompleted, associated video/audio ]
-    def update_metrics(self, metadata, t_end):
+    def update_metrics(self, metadata, t_end, decode_ready):
         adaptation_type = metadata[0] #video, audio or other
         segment_id = metadata[1]
         vidPath = metadata[2]
@@ -325,37 +325,48 @@ class RunHandler:
         print(vidPath, index,index,quality)
         if adaptation_type == "VIDEO":
             calculated_throughput = round(os.path.getsize(vidPath + segment_id)/(t_end - t_start))
-        
-        self.acquired_segments_count = self.acquired_segments_count + 1
+            self.acquired_segments_count = self.acquired_segments_count + 1
         #decoder needs both audio and video files to be completed
         #if metadata.video_completed = True and metadata.audio_completed = True
-        self.nextSegment = self.decode_segments(vidPath, index, index, quality)
+        if decode_ready:
+            self.nextSegment = self.decode_segments(vidPath, index, index, quality)
+            self.Qbuf.put(self.nextSegment)
         self.throughputList.append(calculated_throughput)
-        self.Qbuf.put(self.nextSegment)
         self.log_message(f'THROUGHPUT {self.throughputList[-1]} B/s')
         self.log_message(f'SEGMENTS IN BUFFER {len(self.Qbuf.queue)}')
 
+    def is_associated_media_completed(self, metadata):
+        associated_media = metadata[6] # #TODO: change to metadata['associated']
+        if self.ongoing_requests[associated_media]:
+            return self.ongoing_requests[associated_media][5] #TODO: change to ['iscompleted'] instead of [5]
+        else:
+            return False
+
+    def check_associated_completion(self, metadata):
+        if is_associated_media_completed(metadata):
+            del self.ongoing_requests[seg]
+            associated = segment_meta[7] # change this to a get function that returns a list of media adaptations
+            del self.ongoing_requests[associated]
+            return True
+        else:
+            return False
+            self.ongoing_requests[seg][5] = True #TODO: change [5] to is completed
+    
     def check_request_completion(self, stdout_line):
         out_list = stdout_line.split(b',')
         print(len(out_list), out_list)
         if len(out_list) < 2:
             return False
-        #if out_list[1] == "b'EOM\n'":
         if b'EOM' in out_list[1]:
             t_end = perf_counter() # TODO: use first and last packet arrival time (through stdout stream or IPC)
             seg = out_list[0].decode("utf-8")
-            #re.findall('"([^"]*)"', out_list[0])
             print("Segment completed: ", seg)
-            print("ongoing requests: ", self.ongoing_requests) 
-            #lock ongoing dict mutex
+            #TODO: lock ongoing dict mutex
+            self.ongoing_requests[seg][5] = True #TODO: change [5] to is completed
             segment_meta = self.ongoing_requests[seg]
-            if is_associated_media_completed(segment_meta):
-                del self.ongoing_requests[seg]
-                associated = segment_meta[7] # change this to a get function that returns a list
-                del self.ongoing_requests[associated]
+            is_decode_ready = self.check_associated_completion(segment_meta)
             #release ongoing dict mutex
-            print("before metrics update")
-            self.update_metrics(segment_meta, t_end)
+            self.update_metrics(segment_meta, t_end, is_decode_ready)
             return True
 
     def enqueue_output(self, out, queue):
