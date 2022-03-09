@@ -146,10 +146,10 @@ class RunHandler:
         return self.parsObj.get_segment_duration(self.newSegment)
 
     def quality_handler(self):
-        q = 0
+        q = 8
 
         if(len(self.throughputList) > 0):
-            q = 0 #student_entrypoint(self.throughputList[-1]* 8, self.queue_time(), self.parsObj.get_qualities(), self.rebuffCount)
+            q = student_entrypoint(self.throughputList[-1]* 8, self.queue_time(), self.parsObj.get_qualities(), self.rebuffCount)
             self.rebuffCount = 0
 
         if q is not self.latest_quality:
@@ -286,7 +286,7 @@ class RunHandler:
                         self.parse_segment()
                         #if not self.newSegment:
                             #break
-            self.pause_cond.acquire()
+            #self.pause_cond.acquire()
         print("All segments retrieved")
 
 
@@ -345,7 +345,8 @@ class RunHandler:
         to_unblock = []
         #indexes =  sorted(self.outOfOrder.keys()) # sorting list is costly, in C++ atleast
         for i in sorted(self.outOfOrder.keys()):
-            if i == seg_num + 1:
+            print("bbbbbbbbbbblocked next seg num: ", seg_num)
+            if int(i) == int(seg_num) + 1:
                 print("Found out of order blocked segment: ", i)
                 to_unblock.append(i)
                 seg_num = i
@@ -373,7 +374,7 @@ class RunHandler:
             self.nextSegment = self.decode_segments(vidPath, vidIndex, vidIndex, quality)
             idx = vidIndex.lstrip('0')
             print("////////////to be checked for play buffer: ", idx, " last idx in play buffer: ", self.last_queued_segment_num)
-            if(int(idx) == self.last_queued_segment_num + 1):
+            if(int(idx) == int(self.last_queued_segment_num) + 1):
                 self.Qbuf.put(self.nextSegment) 
                 self.last_queued_segment_num = idx
                 print("/////////////////////segment added to queue with size: ", len(self.Qbuf.queue))

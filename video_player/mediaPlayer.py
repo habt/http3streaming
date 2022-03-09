@@ -211,12 +211,12 @@ class Window(QWidget):
                 is_first_segment = False
             print(segment,duration)
             if(segment):
-                #time.sleep(duration)
-                time.sleep(2)
-            print("total playout so far = ", video_length, "secs")
-        play_duration = time.time() - play_start_time
-        self.movie_handler.log_message(f'PLAY_DURATION {play_duration}')
-        self.movie_handler.log_message(f'VIDEO_LENGTH {video_length}')
+                time.sleep(duration)
+            print("video length = ", video_length, "secs")
+            print("play duration = ", time.time() - play_start_time, "secs")
+            play_duration = time.time() - play_start_time
+            self.movie_handler.log_message(f'PLAY_DURATION {play_duration}')
+            self.movie_handler.log_message(f'VIDEO_LENGTH {video_length}')
         print("Simulated player finished")
         sys.exit()
 
