@@ -39,6 +39,7 @@ class RunHandler:
         self.used_qualities = []
         self.acquired_segments_count = 0
         self.ongoing_requests = {} #dictionary to keep track of ongoing segment downloads
+        self.waiting_associated = {} # dictionary to keep completed segments waiting for associated media to be completed for decoding
         self.pause_cond = threading.Lock()
         self.thread = threading.Thread(target=self.queue_handler, daemon=True)
         self.stop = threading.Event()
@@ -270,11 +271,12 @@ class RunHandler:
                 #while not self.Qbuf.full():
                 while self.acquired_segments_count < self.parsObj.amount_of_segments():
                     # Divide by 2 because ongoing requests includes both audio and video
-                    if len(self.Qbuf.queue) + len(self.ongoing_requests)/2 < self.qSize:
+                    if (len(self.Qbuf.queue) + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.qSize:
                         print("Tot num of segments: ", self.parsObj.amount_of_segments(), ", acquired segments: ", self.acquired_segments_count)
                         print("called for new segment")
                         print("num queued segs: ", len(self.Qbuf.queue))
                         print("num ongoing: ", len(self.ongoing_requests))
+                        print("num waiting: ", len(self.waiting_associated))
                         print("queue capacity: ", self.qSize)
                         #time.sleep(2)
                         print("called for new segment")
@@ -343,9 +345,9 @@ class RunHandler:
     def is_associated_media_completed(self, metadata):
         associated_media = metadata[7] # #TODO: change to metadata['associated'], also associated media should be a list
         print("Associated media is: ", associated_media)
-        if associated_media in self.ongoing_requests:
-            print("-----all media of segment downloaded? ", self.ongoing_requests[associated_media][6])
-            return self.ongoing_requests[associated_media][6] #TODO: change to ['iscompleted'] instead of [5]
+        if associated_media in self.waiting_associated:
+            print("-----all media of segment downloaded? ", self.waiting_associated[associated_media][6])
+            return self.waiting_associated[associated_media][6] #TODO: change to ['iscompleted'] instead of [5]
         else:
             print("segment associated media remaining")
             return False
@@ -356,11 +358,13 @@ class RunHandler:
             del self.ongoing_requests[segment_key]
             print(segment_meta)
             associated_key = segment_meta[7] # change this to a get function that returns a list of media adaptations
-            del self.ongoing_requests[associated_key]
+            del self.waiting_associated[associated_key]
             print("----deleted from ongoing requests: ", len(self.ongoing_requests))
             return True
         else:
             self.ongoing_requests[segment_key][6] = True #TODO: change [6] to key:is_completed
+            self.waiting_associated[segment_key] = self.ongoing_requests[segment_key]
+            del self.ongoing_requests[segment_key]
             return False
     
     def check_request_completion(self, stdout_line):
