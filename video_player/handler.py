@@ -27,6 +27,7 @@ class RunHandler:
         self.mpdPath = None
         self.Qbuf = None
         self.qSize = 0
+        self.last_queued_segment_num = 0
         self.host_ip = host_ip
         self.cca = cca
         self.log_quic = log_level
@@ -40,6 +41,7 @@ class RunHandler:
         self.acquired_segments_count = 0
         self.ongoing_requests = {} #dictionary to keep track of ongoing segment downloads
         self.waiting_associated = {} # dictionary to keep completed segments waiting for associated media to be completed for decoding
+        self.outOfOrder = {}
         self.pause_cond = threading.Lock()
         self.thread = threading.Thread(target=self.queue_handler, daemon=True)
         self.stop = threading.Event()
@@ -271,10 +273,11 @@ class RunHandler:
                 #while not self.Qbuf.full():
                 while (self.acquired_segments_count + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.parsObj.amount_of_segments():
                     # Divide by 2 because ongoing requests includes both audio and video
-                    if (len(self.Qbuf.queue) + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.qSize:
+                    if (len(self.Qbuf.queue) + len(self.outOfOrder) + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.qSize:
                         print("Tot num of segments: ", self.parsObj.amount_of_segments(), ", acquired segments: ", self.acquired_segments_count)
                         print("called for new segment")
                         print("num queued segs: ", len(self.Qbuf.queue))
+                        print("num out of order", len(self.outOfOrder))
                         print("num ongoing: ", len(self.ongoing_requests))
                         print("num waiting: ", len(self.waiting_associated))
                         print("queue capacity: ", self.qSize)
@@ -335,12 +338,56 @@ class RunHandler:
             print("num_acquired_segments: ", self.acquired_segments_count, ", num_ongoing_requests: ", len(self.ongoing_requests) )
         #decoder needs both audio and video files to be completed
         #if metadata.video_completed = True and metadata.audio_completed = True
-        if decode_ready:
-            self.nextSegment = self.decode_segments(vidPath, index, index, quality)
-            self.Qbuf.put(self.nextSegment)
-            print("segment added to queue with size: ", len(self.Qbuf.queue))
-            self.log_message(f'SEGMENTS IN BUFFER {len(self.Qbuf.queue)}')
         print("completed update_metrics")
+    
+    # This function should be moved to a utils file
+    def get_blocked_segs(self,seg_num):
+        to_unblock = []
+        #indexes =  sorted(self.outOfOrder.keys()) # sorting list is costly, in C++ atleast
+        for i in sorted(self.outOfOrder.keys()):
+            if i == seg_num + 1:
+                print("Found out of order blocked segment: ", i)
+                to_unblock.append(i)
+                seg_num = i
+            else:
+                break
+        return to_unblock
+
+
+    def update_outOfOrder(self, seg_num):
+        to_buffer_segs = self.get_blocked_segs(seg_num)
+        if to_buffer_segs:
+            for seg_idx in to_buffer_segs:
+                self.Qbuf.put(self.outOfOrder[seg_idx])
+                del self.outOfOrder[seg_idx]
+                print("/////////////ooooooooooo----segment added to queue with size: ", len(self.Qbuf.queue))
+                self.log_message(f'SEGMENTS IN BUFFER {len(self.Qbuf.queue)}')
+            self.last_queued_segment_num = to_buffer_segs[-1]
+
+    
+    def update_play_buffer(self, segment_meta, is_decode_ready):
+        if is_decode_ready:
+            vidPath = segment_meta[2]
+            vidIndex = segment_meta[3]
+            quality = segment_meta[4]
+            self.nextSegment = self.decode_segments(vidPath, vidIndex, vidIndex, quality)
+            idx = vidIndex.lstrip('0')
+            print("////////////to be checked for play buffer: ", idx, " last idx in play buffer: ", self.last_queued_segment_num)
+            if(int(idx) == self.last_queued_segment_num + 1):
+                self.Qbuf.put(self.nextSegment) 
+                self.last_queued_segment_num = idx
+                print("/////////////////////segment added to queue with size: ", len(self.Qbuf.queue))
+                self.log_message(f'SEGMENTS IN BUFFER {len(self.Qbuf.queue)}')
+                #add out of order completed segments to the buffer
+                if bool(self.outOfOrder):
+                    self.update_outOfOrder(idx)
+                else:
+                    pass
+            else:
+                #index of the segment is the key(change 3 by 'index', i.e access the index with a key instead of list number)
+                print("out of order segment found: ", vidIndex)
+                self.outOfOrder[idx] = self.nextSegment
+
 
     def is_associated_media_completed(self, metadata):
         associated_media = metadata[7] # #TODO: change to metadata['associated'], also associated media should be a list
@@ -381,6 +428,7 @@ class RunHandler:
             segment_meta = self.ongoing_requests[segment_key]
             is_decode_ready = self.check_associated_completion(segment_key, segment_meta)
             #release ongoing dict mutex
+            self.update_play_buffer(segment_meta, is_decode_ready)
             self.update_metrics(segment_meta, t_end, is_decode_ready)
             return True
 
