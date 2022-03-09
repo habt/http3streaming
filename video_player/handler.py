@@ -269,7 +269,7 @@ class RunHandler:
         while not self.stop.is_set():
             with self.pause_cond:
                 #while not self.Qbuf.full():
-                while self.acquired_segments_count < self.parsObj.amount_of_segments():
+                while (self.acquired_segments_count + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.parsObj.amount_of_segments():
                     # Divide by 2 because ongoing requests includes both audio and video
                     if (len(self.Qbuf.queue) + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.qSize:
                         print("Tot num of segments: ", self.parsObj.amount_of_segments(), ", acquired segments: ", self.acquired_segments_count)
