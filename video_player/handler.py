@@ -368,7 +368,7 @@ class RunHandler:
         #print(len(out_list), out_list)
         if len(out_list) < 2:
             return False
-        if b'EOM' in out_list[1]:
+        if b'EOM' in out_list[len(out_list)-1]:
             t_end = perf_counter() # TODO: use first and last packet arrival time (through stdout stream or IPC)
             segment_key = out_list[0].decode("utf-8")
             print("Segment completed:-------- ", segment_key)
@@ -380,7 +380,7 @@ class RunHandler:
             self.update_metrics(segment_meta, t_end, is_decode_ready)
             return True
 
-    def enqueue_output(self, out, queue):
+    def read_client_output(self, out, queue):
         for line in iter(out.readline, b''):
             print(line)
             self.check_request_completion(line)
@@ -390,7 +390,7 @@ class RunHandler:
     # stdout reading thread started after first request (of mpd)
     def start_readThread(self, pipe):
         q = queue.Queue()
-        t = threading.Thread(target=self.enqueue_output, args=(pipe.stdout, q))
+        t = threading.Thread(target=self.read_client_output, args=(pipe.stdout, q))
         t.daemon = False # thread dies with the program
         t.start()
 
