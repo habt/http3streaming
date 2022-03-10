@@ -49,13 +49,14 @@ def DASH(buf_time, rebuffering ,est_bandwidth, R_i , previous_bitrate, T_low=4, 
     #throughput rule:
 
     #print("buf_time : ", buf_time, " rebuffing : ", rebuffering, " est_bandwidth ", est_bandwidth, " previous_bitrate ", previous_bitrate)
-    rate_next = 0
+    #rate_next = 8
     m = len(R_i)
     if buf_time >= T_low*2:
         for k in range(0, m):
             #print(est_bandwidth/8 >= R_i[k][1])
             if est_bandwidth >= R_i[k][1]: #get reasonable value under bandwidth
                 rate_next = R_i[k][0]
+                print("Throughout rate selected: ------------------------")
                 return rate_next
 
 
@@ -64,6 +65,7 @@ def DASH(buf_time, rebuffering ,est_bandwidth, R_i , previous_bitrate, T_low=4, 
     #print("T_low : ", T_low, "buf_time : ", buf_time, "T_low*2 : ", T_low*2)
     if rebuffering != 0: #if there's any rebuffering return lowest possible
         rate_next = R_i[m-1][0]
+        print("Rebuffering selected: ------------------------")
         return rate_next
     elif T_low < buf_time and buf_time < T_low *2: # if there's buffer time work your way to a good rate
         R_min = match(min(i[1] for i in R_i),R_i)
@@ -72,17 +74,21 @@ def DASH(buf_time, rebuffering ,est_bandwidth, R_i , previous_bitrate, T_low=4, 
             rate_next = R_i[i][0]
         else:
             rate_next = R_i[i+1][0]
+        print("Insufficient buffer selected: ------------------------")
         return rate_next
 
     # buffer occupancy rule:
 
     if buf_time > T_rich: #if there's a lot of buffer time return the highest possible
         rate_next = R_i[0][0]
+        print("Abundant buffer selected: ------------------------")
         return rate_next
-    try:
-        return rate_next # return output of throughput rule
-    except UnboundLocalError:
-        return R_i[m-1][0] #nothing worked, return lowest
+    #try:
+        #print("Default highest selected: ------------------------")
+        #return rate_next # return the default value set to the highest at the top
+    #except UnboundLocalError:
+        #print("Default lowest selected: ------------------------")
+    return R_i[m-1][0] #nothing worked, return lowest
 
 #######################################
 

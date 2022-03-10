@@ -43,6 +43,7 @@ class RunHandler:
         self.waiting_associated = {} # dictionary to keep completed segments waiting for associated media to be completed for decoding
         self.outOfOrder = {}
         self.pause_cond = threading.Lock()
+        self.tputList_lock = threading.Lock()
         self.thread = threading.Thread(target=self.queue_handler, daemon=True)
         self.stop = threading.Event()
         self.throughputList = []
@@ -149,7 +150,9 @@ class RunHandler:
         q = 8
 
         if(len(self.throughputList) > 0):
+            self.tputList_lock.acquire()
             q = student_entrypoint(self.throughputList[-1]* 8, self.queue_time(), self.parsObj.get_qualities(), self.rebuffCount)
+            self.tputList_lock.release()
             self.rebuffCount = 0
 
         if q is not self.latest_quality:
@@ -186,8 +189,6 @@ class RunHandler:
             segment_meta.append(t1_start) #5
             video_segment_rl = f'/{self.title}/{segment[0]}'
             audio_segment_rl = f'/{self.title}/{segment[1]}'
-            print("video: ", video_segment_rl)
-            print("audio: ", audio_segment_rl)
             segment_meta.append(False) #6 iscompleted?
 
             #TODO: put segment meta construction in a function
@@ -195,12 +196,8 @@ class RunHandler:
             print(segment_meta)
             # TODO: change meta from list to two-level dictionary
             # Metadata order[ segment[0], vidPath, index, quality, t1_start, iscompleted, associated video/audio ]
-            #segment_meta.append(audio_segment_rl)
-            #segment_meta.append(video_segment_rl)
             self.ongoing_requests[video_segment_rl] = ['VIDEO'] + segment_meta + [audio_segment_rl]
-            print("segment meta after video attach: ", segment_meta)
             self.ongoing_requests[audio_segment_rl] = ['AUDIO'] + segment_meta + [video_segment_rl]
-            print(segment_meta)
             #TODO: request all segments from multipleadaptation sets (i.e. video, audio...) in a single call 
             if self.is_first_segment:
                 print("retrieving first segment")
@@ -216,15 +213,10 @@ class RunHandler:
                 request_new_segment(self.pipe, audio_segment_rl)
 
             #calculated_throughput = round(os.path.getsize(vidPath + segment[0])/(t1_stop - t1_start))
-            #self.throughputList.append(calculated_throughput)
-            #self.log_message(f'THROUGHPUT {self.throughputList[-1]} B/s')
-            #self.log_message(f'SEGMENTS IN BUFFER {len(self.Qbuf.queue)}')
-            #self.nextSegment = self.decode_segments(vidPath, index, index, quality)
         else:
             self.nextSegment = False
             self.killthread()
 
-        #self.Qbuf.put(self.nextSegment)
 
     #PRE: path to next chunks(dir), Index of start and end chunk, quality
     #POST: path to .mp4 file
@@ -330,12 +322,14 @@ class RunHandler:
         
         print(vidPath, index,index,quality)
         if adaptation_type == "VIDEO":
+            # calculate throughput in Bytes per second
             calculated_throughput = round(os.path.getsize(vidPath + segment_id)/(t_end - t_start))
+            self.tputList_lock.acquire()
             self.throughputList.append(calculated_throughput)
-            print("new throughput: ", calculated_throughput, ", tput list size: ", len(self.throughputList))
-            self.log_message(f'THROUGHPUT {self.throughputList[-1]} B/s')
+            self.tputList_lock.release()
+            self.log_message(f'THROUGHPUT {calculated_throughput * 8/1000000} mbps')
+            print("new throughput: ", calculated_throughput, ", data size: ", os.path.getsize(vidPath + segment_id), "duration(sec): ", t_end - t_start)
             self.acquired_segments_count = self.acquired_segments_count + 1
-            print("num_acquired_segments: ", self.acquired_segments_count, ", num_ongoing_requests: ", len(self.ongoing_requests) )
         #decoder needs both audio and video files to be completed
         #if metadata.video_completed = True and metadata.audio_completed = True
         print("completed update_metrics")
@@ -345,7 +339,6 @@ class RunHandler:
         to_unblock = []
         #indexes =  sorted(self.outOfOrder.keys()) # sorting list is costly, in C++ atleast
         for i in sorted(self.outOfOrder.keys()):
-            print("bbbbbbbbbbblocked next seg num: ", seg_num)
             if int(i) == int(seg_num) + 1:
                 print("Found out of order blocked segment: ", i)
                 to_unblock.append(i)
@@ -361,7 +354,6 @@ class RunHandler:
             for seg_idx in to_buffer_segs:
                 self.Qbuf.put(self.outOfOrder[seg_idx])
                 del self.outOfOrder[seg_idx]
-                print("/////////////ooooooooooo----segment added to queue with size: ", len(self.Qbuf.queue))
                 self.log_message(f'SEGMENTS IN BUFFER {len(self.Qbuf.queue)}')
             self.last_queued_segment_num = to_buffer_segs[-1]
 
@@ -373,11 +365,9 @@ class RunHandler:
             quality = segment_meta[4]
             self.nextSegment = self.decode_segments(vidPath, vidIndex, vidIndex, quality)
             idx = vidIndex.lstrip('0')
-            print("////////////to be checked for play buffer: ", idx, " last idx in play buffer: ", self.last_queued_segment_num)
             if(int(idx) == int(self.last_queued_segment_num) + 1):
                 self.Qbuf.put(self.nextSegment) 
                 self.last_queued_segment_num = idx
-                print("/////////////////////segment added to queue with size: ", len(self.Qbuf.queue))
                 self.log_message(f'SEGMENTS IN BUFFER {len(self.Qbuf.queue)}')
                 #add out of order completed segments to the buffer
                 if bool(self.outOfOrder):
@@ -392,7 +382,6 @@ class RunHandler:
 
     def is_associated_media_completed(self, metadata):
         associated_media = metadata[7] # #TODO: change to metadata['associated'], also associated media should be a list
-        print("Associated media is: ", associated_media)
         if associated_media in self.waiting_associated:
             print("-----all media of segment downloaded? ", self.waiting_associated[associated_media][6])
             return self.waiting_associated[associated_media][6] #TODO: change to ['iscompleted'] instead of [5]
@@ -402,7 +391,6 @@ class RunHandler:
 
     def check_associated_completion(self, segment_key, segment_meta):
         if self.is_associated_media_completed(segment_meta):
-            print("keys: ", self.ongoing_requests.keys())
             del self.ongoing_requests[segment_key]
             print(segment_meta)
             associated_key = segment_meta[7] # change this to a get function that returns a list of media adaptations
@@ -417,7 +405,6 @@ class RunHandler:
     
     def check_request_completion(self, stdout_line):
         out_list = stdout_line.split(b',')
-        #print(len(out_list), out_list)
         if len(out_list) < 2:
             return False
         if b'EOM' in out_list[len(out_list)-1]:
@@ -425,7 +412,6 @@ class RunHandler:
             segment_key = out_list[0].decode("utf-8")
             print("Segment completed:-------- ", segment_key)
             #TODO: lock ongoing dict mutex
-            self.ongoing_requests[segment_key][5] = True #TODO: change [5] to is completed
             segment_meta = self.ongoing_requests[segment_key]
             is_decode_ready = self.check_associated_completion(segment_key, segment_meta)
             #release ongoing dict mutex
@@ -435,7 +421,7 @@ class RunHandler:
 
     def read_client_output(self, out, queue):
         for line in iter(out.readline, b''):
-            print(line)
+            #print(line)
             self.check_request_completion(line)
             queue.put(line)
         #out.close()
