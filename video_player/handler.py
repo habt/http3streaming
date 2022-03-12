@@ -408,6 +408,7 @@ class RunHandler:
         if len(out_list) < 2:
             return False
         if b'EOM' in out_list[len(out_list)-1]:
+            print(out_list)
             t_end = perf_counter() # TODO: use first and last packet arrival time (through stdout stream or IPC)
             segment_key = out_list[0].decode("utf-8")
             print("Segment completed:-------- ", segment_key)

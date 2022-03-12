@@ -12,14 +12,14 @@ def blocking_request(file_name, storage_path, host_ip, cca, log):
     pacing = "-pacing=true"
     vlog = "-v=0"
     print(file_name,storage_path)
-    piped_request = subprocess.Popen([program_name, hq_mode, file_path, store, host, congestion, vlog],  stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    piped_request = subprocess.Popen([program_name, hq_mode, file_path, store, host, congestion, vlog],  stdout=subprocess.PIPE, stdin=subprocess.PIPE,stderr=subprocess.PIPE)
     print("after popen call")
     piped_request.stdin.write(b'exit\n')
     piped_request.stdin.flush
     print("after flushing stdin")
-    time.sleep(0.5)
+    time.sleep(1.0)
     piped_request.kill()
-    piped_request.wait()
+    #piped_request.wait()
     print("after popen wait")
     return True
 
