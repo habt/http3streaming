@@ -310,7 +310,7 @@ class RunHandler:
     #######################################
     
     # Metadata order[ video/audio, segment[0], vidPath, index, quality, t1_start, iscompleted, associated video/audio ]
-    def update_metrics(self, metadata, t_end, decode_ready):
+    def update_metrics(self, metadata, t_end, srtt, decode_ready):
         adaptation_type = metadata[0] #video, audio or other
         segment_id = metadata[1]
         vidPath = metadata[2]
@@ -323,12 +323,12 @@ class RunHandler:
         print(vidPath, index,index,quality)
         if adaptation_type == "VIDEO":
             # calculate throughput in Bytes per second
-            calculated_throughput = round(os.path.getsize(vidPath + segment_id)/(t_end - t_start))
+            calculated_throughput = round(os.path.getsize(vidPath + segment_id)/(t_end - t_start - srtt))
             self.tputList_lock.acquire()
             self.throughputList.append(calculated_throughput)
             self.tputList_lock.release()
             self.log_message(f'THROUGHPUT {calculated_throughput * 8/1000000} mbps')
-            print("new throughput: ", calculated_throughput, ", data size: ", os.path.getsize(vidPath + segment_id), "duration(sec): ", t_end - t_start)
+            print("new throughput: ", calculated_throughput, ", data size: ", os.path.getsize(vidPath + segment_id), "duration(sec): ", t_end - t_start, '-', srtt)
             self.acquired_segments_count = self.acquired_segments_count + 1
         #decoder needs both audio and video files to be completed
         #if metadata.video_completed = True and metadata.audio_completed = True
@@ -411,13 +411,14 @@ class RunHandler:
             print(out_list)
             t_end = perf_counter() # TODO: use first and last packet arrival time (through stdout stream or IPC)
             segment_key = out_list[0].decode("utf-8")
+            srtt_sec = float(out_list[len(out_list)-2].decode("utf-8"))/1000000
             print("Segment completed:-------- ", segment_key)
             #TODO: lock ongoing dict mutex
             segment_meta = self.ongoing_requests[segment_key]
             is_decode_ready = self.check_associated_completion(segment_key, segment_meta)
             #release ongoing dict mutex
             self.update_play_buffer(segment_meta, is_decode_ready)
-            self.update_metrics(segment_meta, t_end, is_decode_ready)
+            self.update_metrics(segment_meta, t_end, srtt_sec, is_decode_ready)
             return True
 
     def read_client_output(self, out, queue):

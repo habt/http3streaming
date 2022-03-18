@@ -45,7 +45,5 @@ def start_nonBlocking_request(file_name, storage_path, host_ip, cca, log):
     return piped_request
 
 def get_request(piped,file_name):
-    print("get_request: new segment requested: ", file_name)
     piped.stdin.write(file_name.encode('UTF-8') + b'\n')
     piped.stdin.flush()
-    print("get_request: after new segment flush")
