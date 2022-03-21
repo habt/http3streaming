@@ -5,6 +5,8 @@ from decoder.decoder_interface import decode_segment
 from client.client_interface import *
 from time import perf_counter
 from quality.quality_handler import student_entrypoint
+from quality.throughput_rule import *
+from history.throughputhistory import *
 #from qbuffer import QBuffer
 import queue
 import threading
@@ -30,6 +32,7 @@ class RunHandler:
         self.last_queued_segment_num = 0
         self.host_ip = host_ip
         self.cca = cca
+        self.abr = None
         self.log_quic = log_level
         self.is_first_segment = True
         self.nextSegment = None
@@ -47,6 +50,9 @@ class RunHandler:
         self.thread = threading.Thread(target=self.queue_handler, daemon=True)
         self.stop = threading.Event()
         self.throughputList = []
+        self.throughput_history = None
+        self.throughput = 0
+        self.latency = 0 
         print(self.hitIt(filename, naming_extra))
         self.thread.start()
         print("Init done")
@@ -110,15 +116,21 @@ class RunHandler:
     #PRE: Path to downloaded .mpd file
     #POST: parser object
     def init_Obj(self):
+        self.parsObj = MPDParser(self.mpdPath)
+        self.segment_duration = self.parsObj.get_presentation_duration()/self.parsObj.amount_of_segments()
+        print("min buf time: ",self.parsObj.get_min_buffer_time(), ", Avg. segment duration: ", self.segment_duration)
+        self.abr = ThroughputRule()
+        self.throughput_history = Ewma(self.segment_duration)
+        print("ttttttttttttttttttthroughput history: ", self.throughput_history)
         try:
-            self.parsObj = MPDParser(self.mpdPath)
-            print("min buf time: ",self.parsObj.get_min_buffer_time())
-            self.qSize = int(self.parsObj.get_min_buffer_time()/8) + 3 #TODO: here assuming max segment duration is 8 seconds
+            #TODO: here we are using avg segment duration since the segments are not of the same duration
+            self.qSize = int(self.parsObj.get_min_buffer_time()/self.segment_duration) + 3 
+            print("Queue Size: ", self.qSize)
             if self.parsObj.amount_of_segments() < self.qSize:
                 self.qSize = self.parsObj.amount_of_segments()
             self.Qbuf = queue.Queue(self.qSize)
             self.initialized = True
-            print("Queue Size: ", size)
+            print("Queue Size: ", self.qSize)
             print("Available qualities: ",self.parsObj.get_qualities()) 
             return True, ""
         except:
@@ -151,7 +163,8 @@ class RunHandler:
 
         if(len(self.throughputList) > 0):
             self.tputList_lock.acquire()
-            q = student_entrypoint(self.throughputList[-1]* 8, self.queue_time(), self.parsObj.get_qualities(), self.rebuffCount)
+            #q = student_entrypoint(self.throughputList[-1]* 8, self.queue_time(), self.parsObj.get_qualities(), self.rebuffCount)
+            q = self.abr.get_quality_delay(self.throughput, self.queue_time(), self.latency, self.parsObj.get_qualities(),self.segment_duration)
             self.tputList_lock.release()
             self.rebuffCount = 0
 
@@ -322,13 +335,17 @@ class RunHandler:
         
         print(vidPath, index,index,quality)
         if adaptation_type == "VIDEO":
-            # calculate throughput in Bytes per second
-            calculated_throughput = round(os.path.getsize(vidPath + segment_id)/(t_end - t_start - srtt))
+            #TODO: replace this by actual download time using stream start and end times from quic
+            estimated_download_duration = t_end - t_start - srtt
+             # calculate throughput in Bytes per second
+            calculated_throughput = round(os.path.getsize(vidPath + segment_id)/estimated_download_duration)
             self.tputList_lock.acquire()
-            self.throughputList.append(calculated_throughput)
+            #self.throughputList.append(calculated_throughput)
+            self.throughput, self.latency = self.throughput_history.push(estimated_download_duration,calculated_throughput,srtt)
             self.tputList_lock.release()
             self.log_message(f'THROUGHPUT {calculated_throughput * 8/1000000} mbps')
-            print("new throughput: ", calculated_throughput, ", data size: ", os.path.getsize(vidPath + segment_id), "duration(sec): ", t_end - t_start, '-', srtt)
+            print("calc. throughput: ", calculated_throughput,", hist. tput: ",self.throughput)
+            print("data size: ", os.path.getsize(vidPath + segment_id), "duration(sec): ", t_end - t_start, '-', srtt, ", hist. latency: ", self.latency)
             self.acquired_segments_count = self.acquired_segments_count + 1
         #decoder needs both audio and video files to be completed
         #if metadata.video_completed = True and metadata.audio_completed = True
