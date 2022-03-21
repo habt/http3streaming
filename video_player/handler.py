@@ -278,7 +278,8 @@ class RunHandler:
                 #while not self.Qbuf.full():
                 while (self.acquired_segments_count + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.parsObj.amount_of_segments():
                     # Divide by 2 because ongoing requests includes both audio and video
-                    if (len(self.Qbuf.queue) + len(self.outOfOrder) + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.qSize:
+                    #if (len(self.Qbuf.queue) + len(self.outOfOrder) + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.qSize:
+                    if (len(self.Qbuf.queue) + len(self.ongoing_requests)/2) < self.qSize:
                         print("Tot num of segments: ", self.parsObj.amount_of_segments(), ", acquired segments: ", self.acquired_segments_count)
                         print("called for new segment")
                         print("num queued segs: ", len(self.Qbuf.queue))
@@ -288,7 +289,8 @@ class RunHandler:
                         print("queue capacity: ", self.qSize)
                         #time.sleep(2)
                         print("called for new segment")
-                        self.parse_segment()
+                        if len(self.ongoing_requests) < 3: #allow only one request (one audio and video) at a time (forced sequential)
+                            self.parse_segment()
                         #if not self.newSegment:
                             #break
             #self.pause_cond.acquire()
