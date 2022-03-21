@@ -276,7 +276,7 @@ class RunHandler:
         while not self.stop.is_set():
             with self.pause_cond:
                 #while not self.Qbuf.full():
-                while (self.acquired_segments_count + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.parsObj.amount_of_segments():
+                while (self.acquired_segments_count + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.parsObj.amount_of_segments() + 1:
                     # Divide by 2 because ongoing requests includes both audio and video
                     #if (len(self.Qbuf.queue) + len(self.outOfOrder) + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.qSize:
                     if (len(self.Qbuf.queue) + len(self.ongoing_requests)/2) < self.qSize:
@@ -343,7 +343,7 @@ class RunHandler:
             calculated_throughput = round(os.path.getsize(vidPath + segment_id)/estimated_download_duration)
             self.tputList_lock.acquire()
             #self.throughputList.append(calculated_throughput)
-            self.throughput, self.latency = self.throughput_history.push(estimated_download_duration,calculated_throughput,srtt)
+            self.throughput, self.latency = self.throughput_history.push(estimated_download_duration,calculated_throughput*8,srtt)
             self.tputList_lock.release()
             self.log_message(f'THROUGHPUT {calculated_throughput * 8/1000000} mbps')
             print("calc. throughput: ", calculated_throughput,", hist. tput: ",self.throughput)
@@ -382,7 +382,10 @@ class RunHandler:
             vidPath = segment_meta[2]
             vidIndex = segment_meta[3]
             quality = segment_meta[4]
+            td1 = perf_counter() 
             self.nextSegment = self.decode_segments(vidPath, vidIndex, vidIndex, quality)
+            td2 = perf_counter()
+            print("decode duration:__________", td2-td1)
             idx = vidIndex.lstrip('0')
             if(int(idx) == int(self.last_queued_segment_num) + 1):
                 self.Qbuf.put(self.nextSegment) 
