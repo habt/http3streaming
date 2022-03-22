@@ -77,6 +77,7 @@ class MPDParser():
 
     # Returns the duration of a chunk in seconds (m4s file)
     def get_segment_duration(self, file: str):
+        print("rrrrrrrrrrrrrrrequested duration for segment: ",file)
         index = int(file[-5])
 
         template = self.mpd.periods[0].adaptation_sets[0].representations[0].segment_templates[0]

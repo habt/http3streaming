@@ -124,7 +124,7 @@ class RunHandler:
         print("ttttttttttttttttttthroughput history: ", self.throughput_history)
         try:
             #TODO: here we are using avg segment duration since the segments are not of the same duration
-            self.qSize = int(self.parsObj.get_min_buffer_time()/self.segment_duration) + 3 
+            self.qSize = int(self.parsObj.get_min_buffer_time()/self.segment_duration) + 1 
             print("Queue Size: ", self.qSize)
             if self.parsObj.amount_of_segments() < self.qSize:
                 self.qSize = self.parsObj.amount_of_segments()
@@ -159,9 +159,9 @@ class RunHandler:
         return self.parsObj.get_segment_duration(self.newSegment)
 
     def quality_handler(self):
-        q = 8
+        q = list(self.parsObj.get_qualities().keys())[-1]
 
-        if(len(self.throughputList) > 0):
+        if(self.acquired_segments_count > 0):
             self.tputList_lock.acquire()
             #q = student_entrypoint(self.throughputList[-1]* 8, self.queue_time(), self.parsObj.get_qualities(), self.rebuffCount)
             q = self.abr.get_quality_delay(self.throughput, self.queue_time(), self.latency, self.parsObj.get_qualities(),self.segment_duration)
@@ -185,6 +185,7 @@ class RunHandler:
         segment_meta = []
         self.quality_handler()
         segment = self.parsObj.get_next_segment(self.latest_quality)
+        print("Number of adaptation sets: ", len(segment))
         if(segment is not False):
             #segment_meta.append(self.segment) #0
             segment_meta.append(segment[0]) #1
@@ -280,16 +281,14 @@ class RunHandler:
                     # Divide by 2 because ongoing requests includes both audio and video
                     #if (len(self.Qbuf.queue) + len(self.outOfOrder) + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.qSize:
                     if (len(self.Qbuf.queue) + len(self.ongoing_requests)/2) < self.qSize:
-                        print("Tot num of segments: ", self.parsObj.amount_of_segments(), ", acquired segments: ", self.acquired_segments_count)
-                        print("called for new segment")
-                        print("num queued segs: ", len(self.Qbuf.queue))
-                        print("num out of order", len(self.outOfOrder))
-                        print("num ongoing: ", len(self.ongoing_requests))
-                        print("num waiting: ", len(self.waiting_associated))
-                        print("queue capacity: ", self.qSize)
-                        #time.sleep(2)
-                        print("called for new segment")
                         if len(self.ongoing_requests) < 3: #allow only one request (one audio and video) at a time (forced sequential)
+                            print("Tot num of segments: ", self.parsObj.amount_of_segments(), ", acquired segments: ", self.acquired_segments_count)
+                            print("num queued segs: ", len(self.Qbuf.queue))
+                            print("num out of order", len(self.outOfOrder))
+                            print("num ongoing: ", len(self.ongoing_requests))
+                            print("num waiting: ", len(self.waiting_associated))
+                            print("queue capacity: ", self.qSize)
+                            print("ccccccccccalled for new segment")
                             self.parse_segment()
                         #if not self.newSegment:
                             #break

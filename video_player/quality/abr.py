@@ -19,18 +19,20 @@ class Abr:
     def check_abandon(self, progress, buffer_level):
         return None
 
-    def quality_from_throughput(self, tput,segment_duration, bitrates):
-        global manifest
-        global throughput
-        global latency
+    def quality_from_throughput(self, tput,segment_duration, bitrates, latency):
+        #global manifest
+        #global throughput
+        #global latency
 
         p = segment_duration
 
         index, quality = 0, 8
         # since the highest number indicates thje lowest quality,indexes start from zero, and the difference between two video quality values is two
-        #quality = len(bitrates)*2 - 2 
+        #quality = len(bitrates)*2 - 2
+        print("bitrates in abr:", bitrates)
         while (index + 1 < len(bitrates) and
                latency + p * bitrates[index + 1 ][1] / tput <= p):
             index +=1
         quality = bitrates[index][0]
-        return quality
+        print("ddddddddddddelay from throughput: ", latency + p * bitrates[index][1] / tput, ", segment_duration", p)
+        return index, quality

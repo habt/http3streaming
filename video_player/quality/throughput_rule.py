@@ -13,22 +13,27 @@ class ThroughputRule(Abr):
         self.no_ibr = False #config['no_ibr']
     
     #Arguments are throughput, buffer level in secs, latency(srtt), quality-bitrate list, duration of playing segment.
-    def get_quality_delay(self, throughput, buffer_level, latency, bitrate_list, segment_duration):
+    def get_quality_delay(self, throughput, buffer_level, latency, bitrates_dict, segment_duration):
 
-        quality = self.quality_from_throughput(throughput * ThroughputRule.safety_factor, segment_duration,bitrate_list)
-        
+        bitrates = list(bitrates_dict.items())
+        print("bitrates before sort:", bitrates)
+        bitrates.sort(key=lambda tup: tup[1] , reverse=False)
+        index, quality = self.quality_from_throughput(throughput * ThroughputRule.safety_factor, segment_duration,bitrates, latency)
+        print("qqqqqqqqqqqqqqqqquality from throughput:", quality, index)
         #insufficient buffer rule check
         if not self.no_ibr:
             # insufficient buffer rule
-            safe_size = self.ibr_safety * (get_buffer_level() - latency) * throughput
+            safe_size = self.ibr_safety * (buffer_level - latency) * throughput
             self.ibr_safety *= ThroughputRule.low_buffer_safety_factor_init
             self.ibr_safety = max(self.ibr_safety, ThroughputRule.low_buffer_safety_factor)
-            for q in range(quality):
-                if manifest.bitrates[q + 1] * manifest.segment_time > safe_size:
-                    quality = q
+            for i in range(index):
+                if bitrates[i + 1][1] * segment_duration > safe_size:
+                    quality = bitrates[i][0]
+                    print("iiiiiiiiiiiiiiiinsufficient buffer rule", quality)
                     break
 
-        return (quality, 0)
+        #return (quality, 0) # 0 is when to schedule, used in other rules
+        return quality
     '''
     def check_abandon(self, progress, buffer_level):
         global manifest
