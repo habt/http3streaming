@@ -29,6 +29,7 @@ class RunHandler:
         self.mpdPath = None
         self.Qbuf = None
         self.qSize = 0
+        self.t_end = 0
         self.last_queued_segment_num = 0
         self.host_ip = host_ip
         self.cca = cca
@@ -200,6 +201,7 @@ class RunHandler:
             except:
                 print("Failed to get index and quality")
             t1_start = perf_counter()
+            self.log_message(f'INTERSEGMENT_DELAY {t1_start - self.t_end} s')
             segment_meta.append(t1_start) #5
             video_segment_rl = f'/{self.title}/{segment[0]}'
             audio_segment_rl = f'/{self.title}/{segment[1]}'
@@ -209,24 +211,18 @@ class RunHandler:
             segment_rls = video_segment_rl + "," + audio_segment_rl 
             print(segment_meta)
             # TODO: change meta from list to two-level dictionary
-            # Metadata order[ segment[0], vidPath, index, quality, t1_start, iscompleted, associated video/audio ]
             self.ongoing_requests[video_segment_rl] = ['VIDEO'] + segment_meta + [audio_segment_rl]
             self.ongoing_requests[audio_segment_rl] = ['AUDIO'] + segment_meta + [video_segment_rl]
             #TODO: request all segments from multipleadaptation sets (i.e. video, audio...) in a single call 
             if self.is_first_segment:
-                print("retrieving first segment")
-                #self.pipe = request_first_segment(segment_urls, vidPath, self.host_ip, self.cca, self.log_quic, self.segment)
                 self.pipe = request_first_segment(video_segment_rl, vidPath, self.host_ip, self.cca, self.log_quic, self.segment)
                 request_new_segment(self.pipe, audio_segment_rl)
-                #request_first_segment(f'{self.title}/{segment[1]}', vidPath, self.host_ip, self.cca, self.log_quic, self.segment)
                 self.is_first_segment = False
                 self.start_readThread(self.pipe)
             else:
-                #request_new_segment(self.pipe, segment_urls)
                 request_new_segment(self.pipe, video_segment_rl)
                 request_new_segment(self.pipe, audio_segment_rl)
 
-            #calculated_throughput = round(os.path.getsize(vidPath + segment[0])/(t1_stop - t1_start))
         else:
             self.nextSegment = False
             self.killthread()
@@ -236,7 +232,6 @@ class RunHandler:
     #POST: path to .mp4 file
     def decode_segments(self, path, si, ei, q):
         success,mp4Path = decode_segment(path, si, ei, q, self.title)#(bool, pathToMp4File)
-        print("decode_segments: ", path, si, ei, q, self.title)
         return mp4Path if success else [False, mp4Path]
 
 ################################
@@ -288,7 +283,7 @@ class RunHandler:
                             print("num ongoing: ", len(self.ongoing_requests))
                             print("num waiting: ", len(self.waiting_associated))
                             print("queue capacity: ", self.qSize)
-                            print("ccccccccccalled for new segment")
+                            print("called for new segment")
                             self.parse_segment()
                         #if not self.newSegment:
                             #break
@@ -344,7 +339,12 @@ class RunHandler:
             #self.throughputList.append(calculated_throughput)
             self.throughput, self.latency = self.throughput_history.push(estimated_download_duration,calculated_throughput*8,srtt)
             self.tputList_lock.release()
-            self.log_message(f'THROUGHPUT {calculated_throughput * 8/1000000} mbps')
+            self.log_message(f'COMPLETED {index}')
+            self.log_message(f'SEGMENT_RATE {calculated_throughput * 8/1000000} mbps')
+            self.log_message(f'THROUGHPUT {self.throughput /1000000} mbps')
+            self.log_message(f'SRTT {srtt} s')
+            self.log_message(f'LATENCY {self.latency} s')
+            self.log_message(f'DURATION {t_end - t_start} s')
             print("calc. throughput: ", calculated_throughput,", hist. tput: ",self.throughput)
             print("data size: ", os.path.getsize(vidPath + segment_id), "duration(sec): ", t_end - t_start, '-', srtt, ", hist. latency: ", self.latency)
             self.acquired_segments_count = self.acquired_segments_count + 1
@@ -431,6 +431,7 @@ class RunHandler:
         if b'EOM' in out_list[len(out_list)-1]:
             print(out_list)
             t_end = perf_counter() # TODO: use first and last packet arrival time (through stdout stream or IPC)
+            self.t_end = t_end
             segment_key = out_list[0].decode("utf-8")
             srtt_sec = float(out_list[len(out_list)-2].decode("utf-8"))/1000000
             print("Segment completed:-------- ", segment_key)
