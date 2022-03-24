@@ -44,7 +44,7 @@ class MPDParser():
             adaptations = {}
             for adaptation in self.mpd.periods[0].adaptation_sets:
                 if adaptation.content_type == "video":
-                    adaptations[adaptation.id] = adaptation.representations[0].bandwidth * 8
+                    adaptations[adaptation.id] = adaptation.representations[0].bandwidth
             return collections.OrderedDict(sorted(adaptations.items()))
 
 
