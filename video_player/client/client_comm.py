@@ -2,11 +2,15 @@ import subprocess
 import os
 import time
 
-def blocking_request(file_name, storage_path, host_ip, cca, log):
+def select_executable(cca):
     if cca == "rbbr":
-        program_name = "./team"
+        proxygen_executable = "./team_rbbr"
     else:
-        program_name = "./team_bbr_regressed_mvfst"
+        proxygen_executable = "./team_original_mvfst"
+    return proxygen_executable
+
+def blocking_request(file_name, storage_path, host_ip, cca, log):
+    program_name = select_executable(cca)
     hq_mode = "-mode=client"
     file_path = "--path=/" + file_name
     store = "-outdir=" + storage_path
@@ -28,10 +32,7 @@ def blocking_request(file_name, storage_path, host_ip, cca, log):
 
 def start_nonBlocking_request(file_name, storage_path, host_ip, cca, log):
     global piped_request
-    if cca == "rbbr":
-        program_name = "./team"
-    else:
-        program_name = "./team_bbr_regressed_mvfst"
+    program_name = select_executable(cca)
     hq_mode = "-mode=client"
     file_path = "--path=" + file_name
     store = "-outdir=" + storage_path
