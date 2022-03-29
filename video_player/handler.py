@@ -194,8 +194,9 @@ class RunHandler:
             segment_meta.append(vidPath) #2
             #self.whatisthis(vidPath)
             try:
-                index = segment[0][-9:-4]
-                quality = segment[0][-11:-10]
+                splitted = segment[0].split('_')
+                index =  splitted[-1].split('.')[0]
+                quality = splitted[-2]
                 segment_meta.append(index) #3
                 segment_meta.append(quality) #4
             except:
@@ -231,6 +232,7 @@ class RunHandler:
     #PRE: path to next chunks(dir), Index of start and end chunk, quality
     #POST: path to .mp4 file
     def decode_segments(self, path, si, ei, q):
+        print("TO DECODE: ", si, ei, q)
         success,mp4Path = decode_segment(path, si, ei, q, self.title)#(bool, pathToMp4File)
         return mp4Path if success else [False, mp4Path]
 
@@ -384,7 +386,7 @@ class RunHandler:
             td1 = perf_counter() 
             self.nextSegment = self.decode_segments(vidPath, vidIndex, vidIndex, quality)
             td2 = perf_counter()
-            print("decode duration:__________", td2-td1)
+            print("decode duration:__________", td2-td1, "for ", vidIndex, quality)
             idx = vidIndex.lstrip('0')
             if(int(idx) == int(self.last_queued_segment_num) + 1):
                 self.Qbuf.put(self.nextSegment) 
