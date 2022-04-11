@@ -36,6 +36,7 @@ class RunHandler:
         self.abr = None
         self.log_quic = log_level
         self.is_first_segment = True
+        self.is_video_downloading = False
         self.nextSegment = None
         self.newSegment = None
         self.rebuffCount = 0
@@ -223,6 +224,7 @@ class RunHandler:
             else:
                 request_new_segment(self.pipe, video_segment_rl)
                 request_new_segment(self.pipe, audio_segment_rl)
+            self.is_video_downloading = True
 
         else:
             self.nextSegment = False
@@ -278,7 +280,7 @@ class RunHandler:
                     # Divide by 2 because ongoing requests includes both audio and video
                     #if (len(self.Qbuf.queue) + len(self.outOfOrder) + (len(self.ongoing_requests) + len(self.waiting_associated))/2) < self.qSize:
                     if (len(self.Qbuf.queue) + len(self.ongoing_requests)/2) < self.qSize:
-                        if len(self.ongoing_requests) < 3: #allow only one request (one audio and video) at a time (forced sequential)
+                        if len(self.ongoing_requests) < 3 and not self.is_video_downloading: #allow only one request (one audio and video) at a time (forced sequential)
                             print("Tot num of segments: ", self.parsObj.amount_of_segments(), ", acquired segments: ", self.acquired_segments_count)
                             print("num queued segs: ", len(self.Qbuf.queue))
                             print("num out of order", len(self.outOfOrder))
@@ -439,6 +441,8 @@ class RunHandler:
             print("Segment completed:-------- ", segment_key)
             #TODO: lock ongoing dict mutex
             segment_meta = self.ongoing_requests[segment_key]
+            if segment_meta[0] == "VIDEO":
+                self.is_video_downloading = False
             is_decode_ready = self.check_associated_completion(segment_key, segment_meta)
             #release ongoing dict mutex
             self.update_play_buffer(segment_meta, is_decode_ready)
