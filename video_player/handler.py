@@ -65,16 +65,16 @@ class RunHandler:
         self.segment = 'SEGMENT'
 
     def hitIt(self,filename, extra):
-        self.define_request_types()
-        self.mpdPath = self.request_mpd(filename)
-        if not self.mpdPath: return "Error getting mpdPath in : request_mpd("+filename+")"
-        tmp = self.init_Obj()
-        self.request_all_init_files(self.parsObj.number_of_qualities())
         logging.basicConfig(filename="log/" + self.log_name_generator(filename, extra),
                                     filemode='a',
                                     format='%(asctime)s.%(msecs)d %(levelname)s %(message)s',
                                     datefmt='%H:%M:%S',
                                     level=logging.DEBUG)
+        self.define_request_types()
+        self.mpdPath = self.request_mpd(filename)
+        if not self.mpdPath: return "Error getting mpdPath in : request_mpd("+filename+")"
+        tmp = self.init_Obj()
+        self.request_all_init_files(self.parsObj.number_of_qualities())
         if not tmp[0]: return tmp
 
         print("hitit done")
@@ -126,10 +126,12 @@ class RunHandler:
         print("ttttttttttttttttttthroughput history: ", self.throughput_history)
         try:
             #TODO: here we are using avg segment duration since the segments are not of the same duration
-            self.qSize = int(self.parsObj.get_min_buffer_time()/self.segment_duration) + 1 
-            print("Queue Size: ", self.qSize)
+            self.qSize = int(self.parsObj.get_min_buffer_time()/self.segment_duration) 
+            print("Queue Size: ", self.qSize, self.parsObj.get_min_buffer_time(), "/", self.segment_duration)
             if self.parsObj.amount_of_segments() < self.qSize:
                 self.qSize = self.parsObj.amount_of_segments()
+            self.log_message(f'BUFFER_SIZE {self.qSize}')
+            self.log_message(f'AVG_SEGMENT_DURATION {self.segment_duration}')
             self.Qbuf = queue.Queue(self.qSize)
             self.initialized = True
             print("Queue Size: ", self.qSize)
@@ -323,7 +325,7 @@ class RunHandler:
     #######################################
     
     # Metadata order[ video/audio, segment[0], vidPath, index, quality, t1_start, iscompleted, associated video/audio ]
-    def update_metrics(self, metadata, t_end, srtt, decode_ready):
+    def update_metrics(self, metadata, t_end, srtt, lrtt, decode_ready):
         adaptation_type = metadata[0] #video, audio or other
         segment_id = metadata[1]
         vidPath = metadata[2]
@@ -338,18 +340,19 @@ class RunHandler:
             #TODO: replace this by actual download time using stream start and end times from quic
             estimated_download_duration = t_end - t_start - srtt
              # calculate throughput in Bytes per second
-            calculated_throughput = round(os.path.getsize(vidPath + segment_id)/estimated_download_duration)
+            calculated_throughput = 8 * round(os.path.getsize(vidPath + segment_id)/estimated_download_duration)
             self.tputList_lock.acquire()
             #self.throughputList.append(calculated_throughput)
-            self.throughput, self.latency = self.throughput_history.push(estimated_download_duration,calculated_throughput*8,srtt)
+            self.throughput, self.latency = self.throughput_history.push(estimated_download_duration,calculated_throughput,srtt)
             self.tputList_lock.release()
             self.log_message(f'COMPLETED {index}')
             self.log_message(f'SEGMENT_RATE {calculated_throughput * 8/1000000} mbps')
             self.log_message(f'THROUGHPUT {self.throughput /1000000} mbps')
             self.log_message(f'SRTT {srtt} s')
+            self.log_message(f'LRTT {lrtt} s')
             self.log_message(f'LATENCY {self.latency} s')
             self.log_message(f'DURATION {t_end - t_start} s')
-            print("calc. throughput: ", calculated_throughput,", hist. tput: ",self.throughput)
+            print("calc. throughput(bps): ", calculated_throughput,", hist. tput: ",self.throughput)
             print("data size: ", os.path.getsize(vidPath + segment_id), "duration(sec): ", t_end - t_start, '-', srtt, ", hist. latency: ", self.latency)
             self.acquired_segments_count = self.acquired_segments_count + 1
         #decoder needs both audio and video files to be completed
@@ -438,6 +441,7 @@ class RunHandler:
             self.t_end = t_end
             segment_key = out_list[0].decode("utf-8")
             srtt_sec = float(out_list[len(out_list)-2].decode("utf-8"))/1000000
+            lrtt_sec = float(out_list[len(out_list)-3].decode("utf-8"))/1000000
             print("Segment completed:-------- ", segment_key)
             #TODO: lock ongoing dict mutex
             segment_meta = self.ongoing_requests[segment_key]
@@ -446,7 +450,7 @@ class RunHandler:
             is_decode_ready = self.check_associated_completion(segment_key, segment_meta)
             #release ongoing dict mutex
             self.update_play_buffer(segment_meta, is_decode_ready)
-            self.update_metrics(segment_meta, t_end, srtt_sec, is_decode_ready)
+            self.update_metrics(segment_meta, t_end, srtt_sec, lrtt_sec, is_decode_ready)
             return True
 
     def read_client_output(self, out, queue):

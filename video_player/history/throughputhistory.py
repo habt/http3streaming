@@ -10,7 +10,7 @@ class ThroughputHistory:
 class Ewma(ThroughputHistory):
 
     # for throughput:
-    default_half_life = [8000, 3000]
+    default_half_life = [8, 3]
 
     def __init__(self, segment_duration):
         #global throughput
